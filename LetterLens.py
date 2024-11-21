@@ -26,6 +26,7 @@ def allowed_file(filename):
 # Ruta para la página principal con formulario de carga de imagen
 @app.route('/')
 def index():
+    cleanup_temp_images()
     return render_template('index.html')
 
 # Ruta para procesar la imagen cargada
@@ -73,9 +74,9 @@ def process_image():
         
         # Guardar los datos en la sesión
         session['recognized_text'] = recognized_text
-        session['letters'] = letters
+        session['letters'] = [{'char': letter['char'], 'path': letter['path']} for letter in letters]
         session['image_path'] = filename
-        
+        print("Letras generadas:", letters)
         return render_template('index.html', recognized_text=recognized_text, letters=letters, image_path=filename)
     
     else:
@@ -85,34 +86,32 @@ def process_image():
 # Ruta para procesar las correcciones
 @app.route('/process_corrections', methods=['POST'])
 def process_corrections():
-    if 'letters' not in session:
-        flash('No se han procesado las letras aún. Por favor, sube una imagen primero.')
-        return redirect(url_for('index'))
-    
-    # Obtener las letras originales
-    letters = session['letters']
-    
-    # Obtener las letras corregidas del formulario
-    for idx in range(len(letters)):
-        corrected_char = request.form.get(f'letters[{idx}]')
+    print("Session letters:", session.get('letters'))
+    action = request.form.get('action')
+    if action.startswith('remove_'):
+        indice_letra_a_eliminar = int(action.split('_')[1])
+        letters = session.get('letters', [])
+        letra_a_eliminar = letters.pop(indice_letra_a_eliminar)
+        if os.path.exists(letra_a_eliminar['path']):
+            os.remove(letra_a_eliminar['path'])
         
-        # Solo actualizar la letra si ha sido modificada
-        if corrected_char:
-            letters[idx]['char'] = corrected_char
+        session['letters'] = letters
+        flash('Letra Eliminada')
+
+    elif action == 'save':
+        letters = session.get('letters', [])
+        for idx in enumerate(letters):
+            corrected_char = request.form.get(f'letters[{idx}]')
+            if corrected_char:
+                letters[idx]['char'] = corrected_char
+        session['letters'] = letters
+        flash('Correcciones guardadas')
+
+    recognized_text = session.get('recognized_text')
+    filename = session.get('image_path')
     
-    # Manejar la eliminación de letras
-    if 'remove_letter' in request.form:
-        letter_idx_to_remove = int(request.form['remove_letter'])
-        letter_to_remove = letters.pop(letter_idx_to_remove)  # Eliminar la letra seleccionada
-        
-        # Eliminar la imagen de la letra
-        if os.path.exists(letter_to_remove['path']):
-            os.remove(letter_to_remove['path'])
-    
-    # Guardar las letras corregidas en la sesión
-    session['letters'] = letters
-    
-    return render_template('index.html', recognized_text=session.get('recognized_text', ''), letters=letters, image_path=session.get('image_path'))
+    return render_template('index.html', recognized_text=recognized_text, letters=letters, image_path=filename)
+
 
 # Ruta para limpiar las imágenes temporales
 @app.route('/cleanup_temp_images')

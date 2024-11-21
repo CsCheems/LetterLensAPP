@@ -89,13 +89,12 @@
                                 {% for letter in letters %}
                                     <div class="text-center m-2">
                                         <img src="data:image/png;base64,{{ letter['img_data'] }}" class="img-fluid" alt="Letra recortada">
-                                        <p>{{ letter['char'] }}</p>
                                         <input type="text" name="letters[{{ loop.index0 }}]" value="{{ letter['char'] }}" class="form-control" style="width: 60px;">
-                                        <button type="submit" class="btn btn-danger btn-sm mt-2" name="remove_letter" value="{{ loop.index0 }}">Eliminar</button>
+                                        <button type="submit" class="btn btn-danger btn-sm mt-2" name="action" value="remove_{{ loop.index0 }}">Eliminar</button>
                                     </div>
                                 {% endfor %}
                             </div>
-                            <button type="submit" class="btn btn-primary mt-4">Guardar Correcciones</button>
+                            <button type="submit" class="btn btn-primary mt-4" name="action" value="save">Guardar Correcciones</button>
                         </form>
                     </div>
                 </div>
