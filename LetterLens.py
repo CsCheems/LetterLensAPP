@@ -4,6 +4,10 @@ import base64
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.utils import secure_filename
 import pytesseract
+from reportlab.lib.pagesizes import letter # type: ignore
+from reportlab.pdfgen import canvas # type: ignore
+from io import BytesIO
+from flask import send_file
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Ajusta la ruta según sea necesario
 
@@ -124,6 +128,56 @@ def cleanup_temp_images():
     
     flash('Las imágenes temporales se han eliminado.')
     return redirect(url_for('index'))
+
+@app.route('/download_pdf')
+def download_pdf():
+    # Crear un buffer de memoria para el archivo PDF
+    pdf_buffer = BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=letter)
+    width, height = letter
+
+    # Establecer el título en la parte superior
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, height - 40, "Reporte de Caracteres Segmentados")
+    
+    # Agregar una línea divisoria para el encabezado
+    c.setStrokeColorRGB(0, 0, 0)  # Color de la línea (negro)
+    c.setLineWidth(1)
+    c.line(100, height - 50, width - 100, height - 50)  # Línea horizontal
+    c.setFont("Helvetica", 12)
+
+    # Y inicial de la posición para las letras
+    y_position = height - 70
+    letters = session.get('letters', [])
+    
+    # Agregar las letras y sus imágenes recortadas al PDF
+    for letter_data in letters:
+        char = letter_data['char']
+        # Agregar la letra como texto en negrita
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(100, y_position, f"Letra: {char}")
+        y_position -= 20
+
+        # Agregar las imágenes de las letras al PDF (si las hay)
+        letter_image_path = letter_data['path']
+        if os.path.exists(letter_image_path):
+            c.drawImage(letter_image_path, 200, y_position, width=50, height=50)
+            y_position -= 60
+
+        # Asegurar que no se sobrepasen los límites de la página
+        if y_position < 100:
+            c.showPage()  # Crear una nueva página si es necesario
+            y_position = height - 40
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(100, height - 40, "Reporte de Caracteres Segmentados")
+            c.setFont("Helvetica", 12)
+            c.line(100, height - 50, width - 100, height - 50)
+
+    c.save()
+
+    # Regresar al cliente el archivo PDF generado
+    pdf_buffer.seek(0)
+    return send_file(pdf_buffer, as_attachment=True, download_name="segmentados.pdf", mimetype="application/pdf")
 
 # Ejecutar la aplicación
 if __name__ == '__main__':
